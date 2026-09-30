@@ -4,7 +4,8 @@
 //   GEMINI_MODEL    (isteğe bağlı) — model adı; boşsa aşağıdaki varsayılan kullanılır
 //   ERISIM_KODU     (isteğe bağlı) — ayarlanırsa sadece ?kod=... linkiyle açanlar kullanabilir
 
-const DEFAULT_MODEL = "gemini-3.5-flash";
+// Sırayla denenir; biri kapanmışsa (404) bir sonrakine geçilir
+const MODELS = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3-flash-preview", "gemini-2.5-flash"];
 
 const PROMPT = (hint) => `Sen bir beslenme uzmanısın. Fotoğraftaki tabakta/öğünde bulunan her yiyeceği ve içeceği tanı, porsiyonunu gözle tahmin et ve kalorisini hesapla. Türk mutfağını iyi bil (pilav, köfte, mercimek çorbası, börek, dolma vb.).
 ${hint ? "Kullanıcının notu (buna öncelik ver): " + hint + "\n" : ""}
@@ -17,7 +18,7 @@ module.exports = async function handler(req, res) {
 
   const key = process.env.GEMINI_API_KEY;
   if (!key) return res.status(500).json({ hata: "GEMINI_API_KEY ayarlanmamış" });
-  const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
+  const models = process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL, ...MODELS] : MODELS;
 
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
   const code = process.env.ERISIM_KODU;
@@ -28,29 +29,36 @@ module.exports = async function handler(req, res) {
   if (image.length > 4_000_000) return res.status(413).json({ hata: "fotoğraf çok büyük" });
   const hint = String(body.hint || "").slice(0, 300);
 
+  const payload = JSON.stringify({
+    contents: [{
+      role: "user",
+      parts: [
+        { inline_data: { mime_type: "image/jpeg", data: image } },
+        { text: PROMPT(hint) },
+      ],
+    }],
+    generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+  });
+
   try {
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-      {
-        method: "POST",
-        headers: { "x-goog-api-key": key, "content-type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            role: "user",
-            parts: [
-              { inline_data: { mime_type: "image/jpeg", data: image } },
-              { text: PROMPT(hint) },
-            ],
-          }],
-          generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
-        }),
-      }
-    );
+    let r = null, lastErr = "";
+    for (const model of models) {
+      r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+        { method: "POST", headers: { "x-goog-api-key": key, "content-type": "application/json" }, body: payload }
+      );
+      if (r.status !== 404) break;
+      lastErr = "model bulunamadı: " + model;
+      console.error(lastErr);
+    }
 
     if (r.status === 429) return res.status(429).json({ hata: "yoğun" });
     if (!r.ok) {
-      console.error("Gemini hata", r.status, model, await r.text());
-      return res.status(502).json({ hata: "servis" });
+      const t = await r.text();
+      console.error("Gemini hata", r.status, t);
+      let msg = lastErr;
+      try { msg = JSON.parse(t).error.message || msg; } catch {}
+      return res.status(502).json({ hata: "Gemini " + r.status + ": " + String(msg).slice(0, 160) });
     }
 
     const out = await r.json();

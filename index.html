@@ -104,7 +104,7 @@ textarea{width:100%;font:inherit;border-radius:14px;border:1px solid var(--line)
       <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
       <b>Fotoğraf çek veya seç</b>
       <span class="muted">Tabağın tamamı görünsün, üstten çekmek en iyisi</span>
-      <input id="photo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment">
+      <input id="photo" type="file" accept="image/*">
     </label>
     <img id="preview" class="preview" alt="Seçilen tabak fotoğrafı" hidden>
     <div id="askBox" hidden style="display:grid;gap:10px">
@@ -251,7 +251,10 @@ textarea{width:100%;font:inherit;border-radius:14px;border:1px solid var(--line)
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image, hint: $("hint").value.trim(), kod: store.get("kod", "") })
       });
-      if (!r.ok){ showStatus(ERR[r.status] || "Şu an hesaplanamadı. Biraz sonra tekrar dene.", true); return; }
+      if (!r.ok){
+        let why = ""; try { const j = await r.json(); why = j && j.hata ? " (" + j.hata + ")" : ""; } catch {}
+        showStatus((ERR[r.status] || "Şu an hesaplanamadı. Biraz sonra tekrar dene.") + why, true); return;
+      }
       const data = await r.json();
       const list = Array.isArray(data && data.yemekler) ? data.yemekler : [];
       if (!list.length){ showStatus((data && data.not) || "Fotoğrafta yemek göremedim. Tabağı daha net çekip tekrar dene.", true); return; }
