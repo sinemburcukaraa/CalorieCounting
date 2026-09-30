@@ -4,7 +4,7 @@
 //   GEMINI_MODEL    (isteğe bağlı) — model adı; boşsa aşağıdaki varsayılan kullanılır
 //   ERISIM_KODU     (isteğe bağlı) — ayarlanırsa sadece ?kod=... linkiyle açanlar kullanabilir
 
-// Sırayla denenir; biri kapanmışsa (404) bir sonrakine geçilir
+// Sırayla denenir; biri kapalı, limiti dolmuş ya da meşgulse bir sonrakine geçilir
 const MODELS = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3-flash-preview", "gemini-2.5-flash"];
 
 const PROMPT = (hint) => `Sen bir beslenme uzmanısın. Fotoğraftaki tabakta/öğünde bulunan her yiyeceği ve içeceği tanı, porsiyonunu gözle tahmin et ve kalorisini hesapla. Türk mutfağını iyi bil (pilav, köfte, mercimek çorbası, börek, dolma vb.).
@@ -47,9 +47,11 @@ module.exports = async function handler(req, res) {
         `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
         { method: "POST", headers: { "x-goog-api-key": key, "content-type": "application/json" }, body: payload }
       );
-      if (r.status !== 404) break;
-      lastErr = "model bulunamadı: " + model;
-      console.error(lastErr);
+      // 404: model kapalı, 429: bu modelin ücretsiz limiti doldu, 500/503: model o an meşgul
+      // Her modelin limiti ayrı, o yüzden sıradakini dene
+      if (![404, 429, 500, 503].includes(r.status)) break;
+      lastErr = model + " → " + r.status;
+      console.error("Sıradaki modele geçiliyor:", lastErr);
     }
 
     if (r.status === 429) return res.status(429).json({ hata: "yoğun" });
