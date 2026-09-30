@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1F6B4F">
+<title>Tabak Kalori</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&display=swap">
+<style>
+/* Layout: tek sütun, telefona göre; üstte günün toplamı, ortada büyük "fotoğraf çek" alanı, altta günlük liste */
+:root{
+  --bg:#EEF3EE; --surface:#FFFFFF; --fg:#1B2A21; --muted:#5E6E63; --line:#D5DFD6;
+  --accent:#1F6B4F; --accent-ink:#FFFFFF; --sun:#F2B632; --warn:#B4442C; --soft:#E1ECE3;
+  --display:"Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+  --body:"Nunito Sans", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121A15; --surface:#1A251E; --fg:#E7EFE8; --muted:#9BAEA1; --line:#2C3A31;
+  --accent:#4FB88C; --accent-ink:#0D1611; --sun:#F2C04E; --warn:#E97B62; --soft:#20302A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121A15; --surface:#1A251E; --fg:#E7EFE8; --muted:#9BAEA1; --line:#2C3A31;
+  --accent:#4FB88C; --accent-ink:#0D1611; --sun:#F2C04E; --warn:#E97B62; --soft:#20302A; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:17px;line-height:1.5;padding:20px 16px 48px}
+.wrap{max-width:560px;margin:0 auto;display:grid;gap:20px}
+h1{font-family:var(--display);font-weight:800;font-size:1.9rem;margin:0;letter-spacing:-.01em}
+h2{font-family:var(--display);font-weight:600;font-size:1.2rem;margin:0}
+.muted{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+button{font:inherit;cursor:pointer;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:10px 14px;min-height:44px}
+button:focus-visible,input:focus-visible,textarea:focus-visible,label.pick:focus-within{outline:3px solid var(--sun);outline-offset:2px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700;font-size:1.1rem;min-height:54px}
+button:disabled{opacity:.55;cursor:default}
+
+/* Günün özeti */
+.today{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:18px;display:grid;gap:10px}
+.big{font-family:var(--display);font-weight:800;font-size:2.6rem;line-height:1}
+.big small{font-family:var(--body);font-size:1rem;font-weight:600;color:var(--muted)}
+.bar{height:12px;border-radius:99px;background:var(--soft);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .4s}
+.bar i.over{background:var(--warn)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.target{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:.95rem}
+.target input{width:84px;font:inherit;padding:6px 8px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);text-align:right}
+
+/* Fotoğraf alanı */
+label.pick{display:grid;place-items:center;gap:6px;text-align:center;border:2px dashed var(--accent);border-radius:20px;padding:28px 16px;background:var(--surface);cursor:pointer}
+label.pick b{font-family:var(--display);font-size:1.35rem;color:var(--accent)}
+label.pick svg{width:44px;height:44px;stroke:var(--accent)}
+label.pick input{position:absolute;opacity:0;width:1px;height:1px}
+.preview{width:100%;max-height:300px;object-fit:cover;border-radius:18px;display:block}
+textarea{width:100%;font:inherit;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:10px 12px;resize:vertical;min-height:56px}
+.status{padding:12px 14px;border-radius:14px;background:var(--soft)}
+.status.err{background:transparent;border:1px solid var(--warn);color:var(--warn)}
+
+/* Sonuç */
+.result{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:16px;display:grid;gap:12px}
+.item{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding-block:10px;border-top:1px solid var(--line)}
+.item:first-of-type{border-top:0}
+.item .name{font-weight:700;min-width:0}
+.item .kcal{font-weight:700;text-align:right}
+.item .meta{grid-column:1/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:.93rem}
+.step{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.step button{border:0;border-radius:0;min-height:38px;min-width:40px;padding:4px 10px;font-weight:700}
+.step span{padding:0 8px;min-width:48px;text-align:center}
+.total{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--display);font-weight:800;font-size:1.4rem;border-top:2px solid var(--fg);padding-top:10px}
+.note{font-size:.93rem;color:var(--muted)}
+.actions{display:grid;grid-template-columns:1fr auto;gap:10px}
+
+/* Günlük */
+.log{display:grid;gap:10px}
+.entry{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:10px 12px}
+.entry img{width:56px;height:56px;border-radius:12px;object-fit:cover;background:var(--soft)}
+.entry .ph{width:56px;height:56px;border-radius:12px;background:var(--soft)}
+.entry div{min-width:0}
+.entry .t{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.entry .del{min-height:38px;padding:4px 10px;font-size:.9rem;color:var(--muted)}
+.empty{border:1px dashed var(--line);border-radius:16px;padding:18px;color:var(--muted);text-align:center}
+.foot{font-size:.85rem;color:var(--muted);text-align:center}
+@media (prefers-reduced-motion: reduce){.bar i{transition:none}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <h1>Tabak Kalori</h1>
+    <p class="muted" style="margin:4px 0 0">Tabağının fotoğrafını çek, kalorisini söyleyeyim.</p>
+  </header>
+
+  <section class="today" aria-label="Bugünün toplamı">
+    <div class="row">
+      <div class="big num"><span id="dayTotal">0</span> <small>/ <span id="dayTarget">1800</span> kcal bugün</small></div>
+    </div>
+    <div class="bar"><i id="dayBar"></i></div>
+    <div class="row">
+      <span class="muted" id="dayLeft">Günlük hedefe 1800 kcal var</span>
+      <label class="target" for="targetInput">Hedef <input id="targetInput" type="number" inputmode="numeric" min="800" max="5000" step="50" value="1800"> kcal</label>
+    </div>
+  </section>
+
+  <section id="pickArea" style="display:grid;gap:12px">
+    <label class="pick" for="photo" id="pickLabel">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      <b>Fotoğraf çek veya seç</b>
+      <span class="muted">Tabağın tamamı görünsün, üstten çekmek en iyisi</span>
+      <input id="photo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment">
+    </label>
+    <img id="preview" class="preview" alt="Seçilen tabak fotoğrafı" hidden>
+    <div id="askBox" hidden style="display:grid;gap:10px">
+      <label for="hint" id="hintLabel" class="muted" style="font-size:.95rem">İstersen yaz, daha doğru hesaplarım (örn. "2 köfte, yarım porsiyon pilav")</label>
+      <textarea id="hint" rows="2" placeholder="İsteğe bağlı"></textarea>
+      <div class="actions">
+        <button class="primary" id="analyzeBtn">Kaloriyi hesapla</button>
+        <button id="resetBtn">Vazgeç</button>
+      </div>
+    </div>
+    <div id="status" class="status" role="status" hidden></div>
+  </section>
+
+  <section id="result" class="result" hidden aria-label="Hesaplanan yemekler">
+    <h2 id="mealTitle">Tabakta gördüklerim</h2>
+    <div id="items"></div>
+    <div class="total"><span>Toplam</span><span class="num"><span id="mealTotal">0</span> kcal</span></div>
+    <p class="note" id="mealNote"></p>
+    <p class="note">Porsiyon daha az ya da çoksa − / + ile düzelt. Değerler tahminidir.</p>
+    <div class="actions">
+      <button class="primary" id="saveBtn">Bugüne ekle</button>
+      <button id="discardBtn">Sil</button>
+    </div>
+  </section>
+
+  <section style="display:grid;gap:12px" aria-label="Bugün yediklerim">
+    <h2>Bugün yediklerim</h2>
+    <div class="log" id="log"></div>
+  </section>
+
+  <p class="foot">Kaloriler fotoğraftan yapılan tahmindir, tartı kadar kesin değildir.</p>
+</main>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const store = {
+    get(k, d){ try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+    set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } }
+  };
+  const dayKey = () => { const d = new Date(); return "log-" + d.getFullYear() + "-" + (d.getMonth()+1) + "-" + d.getDate(); };
+  const fmt = n => Math.round(n).toLocaleString("tr-TR");
+
+  let target = store.get("target", 1800);
+  let file = null, previewUrl = null, meal = null, sample = null, ctl = null;
+
+  // ---- Günün özeti ve günlük ----
+  function renderDay(){
+    const log = store.get(dayKey(), []);
+    const total = log.reduce((s,e) => s + e.kcal, 0);
+    $("dayTotal").textContent = fmt(total);
+    $("dayTarget").textContent = fmt(target);
+    $("targetInput").value = target;
+    const pct = Math.min(100, total / target * 100);
+    const bar = $("dayBar"); bar.style.width = pct + "%"; bar.classList.toggle("over", total > target);
+    $("dayLeft").textContent = total > target ? "Hedefi " + fmt(total - target) + " kcal aştın" : "Günlük hedefe " + fmt(target - total) + " kcal var";
+    const box = $("log"); box.textContent = "";
+    if (!log.length){
+      const e = document.createElement("div"); e.className = "empty";
+      e.textContent = "Henüz bir şey eklenmedi. Yukarıdan ilk öğününün fotoğrafını çek.";
+      box.append(e); return;
+    }
+    log.slice().reverse().forEach(en => {
+      const row = document.createElement("div"); row.className = "entry";
+      if (en.thumb){ const im = document.createElement("img"); im.src = en.thumb; im.alt = ""; row.append(im); }
+      else { const p = document.createElement("div"); p.className = "ph"; row.append(p); }
+      const mid = document.createElement("div");
+      const t = document.createElement("div"); t.className = "t"; t.textContent = en.title;
+      const s = document.createElement("div"); s.className = "muted num"; s.style.fontSize = ".93rem";
+      s.textContent = en.time + " · " + fmt(en.kcal) + " kcal";
+      mid.append(t, s);
+      const del = document.createElement("button"); del.className = "del"; del.textContent = "Sil";
+      del.setAttribute("aria-label", en.title + " kaydını sil");
+      del.onclick = () => {
+        if (del.dataset.sure){ store.set(dayKey(), store.get(dayKey(), []).filter(x => x.id !== en.id)); renderDay(); }
+        else { del.dataset.sure = "1"; del.textContent = "Emin misin?"; del.style.color = "var(--warn)"; }
+      };
+      row.append(mid, del); box.append(row);
+    });
+  }
+  $("targetInput").addEventListener("change", e => {
+    const v = Math.round(Number(e.target.value));
+    if (v >= 800 && v <= 5000){ target = v; store.set("target", v); }
+    renderDay();
+  });
+
+  // ---- Fotoğraf seçimi ----
+  function showStatus(msg, err){ const s = $("status"); s.hidden = !msg; s.textContent = msg || ""; s.classList.toggle("err", !!err); }
+  function resetPick(){
+    file = null; if (previewUrl) URL.revokeObjectURL(previewUrl); previewUrl = null;
+    $("photo").value = ""; $("preview").hidden = true; $("askBox").hidden = true; $("pickLabel").hidden = false;
+    $("hint").value = ""; showStatus("");
+  }
+  $("photo").addEventListener("change", e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    file = f; if (previewUrl) URL.revokeObjectURL(previewUrl);
+    previewUrl = URL.createObjectURL(f);
+    $("preview").src = previewUrl; $("preview").hidden = false;
+    $("pickLabel").hidden = true; $("askBox").hidden = false; $("result").hidden = true; showStatus("");
+  });
+  $("resetBtn").onclick = () => { if (ctl) ctl.abort(); resetPick(); };
+
+  // ---- Sunucu üzerinden analiz ----
+  // Link ?kod=... ile açıldıysa kodu bu telefonda sakla, bir daha sorma
+  try {
+    const k = new URLSearchParams(location.search).get("kod");
+    if (k) { store.set("kod", k); history.replaceState(null, "", location.pathname); }
+  } catch {}
+
+  // Fotoğrafı telefonda küçült (hızlı yükleme, düşük maliyet)
+  function shrink(f){
+    return new Promise((res, rej) => {
+      const url = URL.createObjectURL(f), im = new Image();
+      im.onload = () => {
+        const max = 1280, s = Math.min(1, max / Math.max(im.width, im.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(im.width * s); c.height = Math.round(im.height * s);
+        c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        res(c.toDataURL("image/jpeg", .82).split(",")[1]);
+      };
+      im.onerror = () => { URL.revokeObjectURL(url); rej(new Error("okunamadi")); };
+      im.src = url;
+    });
+  }
+
+  const ERR = {
+    401: "Giriş kodu geçersiz. Sana gönderilen linki kullanarak tekrar aç.",
+    413: "Fotoğraf çok büyük. Başka bir fotoğraf dene.",
+    429: "Çok sık denendi. Bir dakika bekleyip tekrar dene.",
+  };
+
+  $("analyzeBtn").onclick = async () => {
+    if (!file) return;
+    const btn = $("analyzeBtn"); btn.disabled = true;
+    ctl = new AbortController();
+    showStatus("Tabağa bakıyorum… Bu 10–20 saniye sürebilir.");
+    try {
+      let image;
+      try { image = await shrink(file); }
+      catch { showStatus("Bu fotoğraf açılamadı. Başka bir fotoğraf dene.", true); return; }
+      const r = await fetch("/api/analyze", {
+        method: "POST", signal: ctl.signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image, hint: $("hint").value.trim(), kod: store.get("kod", "") })
+      });
+      if (!r.ok){ showStatus(ERR[r.status] || "Şu an hesaplanamadı. Biraz sonra tekrar dene.", true); return; }
+      const data = await r.json();
+      const list = Array.isArray(data && data.yemekler) ? data.yemekler : [];
+      if (!list.length){ showStatus((data && data.not) || "Fotoğrafta yemek göremedim. Tabağı daha net çekip tekrar dene.", true); return; }
+      meal = {
+        title: String(data.baslik || "Öğün").slice(0, 60),
+        note: String(data.not || ""),
+        items: list.map(it => ({
+          ad: String(it.ad || "Yiyecek"), porsiyon: String(it.porsiyon || ""),
+          kalori: Math.max(0, Number(it.kalori) || 0), protein: Number(it.protein) || 0,
+          karb: Number(it.karbonhidrat) || 0, yag: Number(it.yag) || 0, kat: 1
+        }))
+      };
+      showStatus(""); renderMeal();
+    } catch (e) {
+      if (e && e.name === "AbortError") { showStatus(""); return; }
+      showStatus("İnternet bağlantısını kontrol edip tekrar dene.", true);
+    } finally { btn.disabled = false; }
+  };
+
+  function mealTotal(){ return meal.items.reduce((s,i) => s + i.kalori * i.kat, 0); }
+  function renderMeal(){
+    $("result").hidden = false;
+    $("mealTitle").textContent = meal.title;
+    $("mealNote").textContent = meal.note; $("mealNote").hidden = !meal.note;
+    const box = $("items"); box.textContent = "";
+    meal.items.forEach((it, idx) => {
+      const row = document.createElement("div"); row.className = "item";
+      const n = document.createElement("div"); n.className = "name"; n.textContent = it.ad;
+      const k = document.createElement("div"); k.className = "kcal num"; k.textContent = fmt(it.kalori * it.kat) + " kcal";
+      const meta = document.createElement("div"); meta.className = "meta";
+      const p = document.createElement("span"); p.textContent = it.porsiyon;
+      const st = document.createElement("span"); st.className = "step";
+      const minus = document.createElement("button"); minus.textContent = "−"; minus.setAttribute("aria-label", it.ad + " porsiyonunu azalt");
+      const lab = document.createElement("span"); lab.className = "num"; lab.textContent = "×" + it.kat.toLocaleString("tr-TR");
+      const plus = document.createElement("button"); plus.textContent = "+"; plus.setAttribute("aria-label", it.ad + " porsiyonunu artır");
+      minus.onclick = () => { it.kat = Math.max(0, +(it.kat - .25).toFixed(2)); renderMeal(); };
+      plus.onclick = () => { it.kat = Math.min(5, +(it.kat + .25).toFixed(2)); renderMeal(); };
+      st.append(minus, lab, plus);
+      const mac = document.createElement("span"); mac.className = "num";
+      mac.textContent = "P " + Math.round(it.protein*it.kat) + " g · K " + Math.round(it.karb*it.kat) + " g · Y " + Math.round(it.yag*it.kat) + " g";
+      meta.append(st, p, mac);
+      row.append(n, k, meta); box.append(row);
+    });
+    $("mealTotal").textContent = fmt(mealTotal());
+  }
+
+  function thumbOf(url){
+    return new Promise(res => {
+      const im = new Image();
+      im.onload = () => {
+        try {
+          const c = document.createElement("canvas"); c.width = c.height = 112;
+          const s = Math.min(im.width, im.height);
+          c.getContext("2d").drawImage(im, (im.width-s)/2, (im.height-s)/2, s, s, 0, 0, 112, 112);
+          res(c.toDataURL("image/jpeg", .7));
+        } catch { res(null); }
+      };
+      im.onerror = () => res(null); im.src = url;
+    });
+  }
+
+  $("saveBtn").onclick = async () => {
+    if (!meal) return;
+    const now = new Date();
+    const entry = {
+      id: now.getTime() + "-" + Math.random().toString(36).slice(2,6),
+      title: meal.title, kcal: Math.round(mealTotal()),
+      time: now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }),
+      thumb: previewUrl ? await thumbOf(previewUrl) : null
+    };
+    const log = store.get(dayKey(), []); log.push(entry);
+    let ok = store.set(dayKey(), log);
+    if (!ok){ entry.thumb = null; ok = store.set(dayKey(), log); }
+    meal = null; $("result").hidden = true; resetPick(); renderDay();
+    showStatus(ok ? "Eklendi: " + entry.title + " (" + fmt(entry.kcal) + " kcal)" : "Bu tarayıcı kayıt tutmaya izin vermiyor; toplam sayfa kapanınca silinir.", !ok);
+  };
+  $("discardBtn").onclick = () => { meal = null; $("result").hidden = true; resetPick(); };
+
+  renderDay();
+})();
+</script>
+</body>
+</html>
